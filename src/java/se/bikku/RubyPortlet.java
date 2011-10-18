@@ -47,6 +47,7 @@ public class RubyPortlet extends GenericPortlet {
     PortletPreferences prefs = aRenderRequest.getPreferences();
 
     ScriptingContainer container = getScriptingContainer(writer);
+    container.put("request", aRenderRequest);
 
     container.runScriptlet(prefs.getValue("script", ""));
     container.runScriptlet("require 'erb'; template = ERB.new <<-EOF\n" +
