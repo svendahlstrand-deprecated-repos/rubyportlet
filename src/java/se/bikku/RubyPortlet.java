@@ -29,36 +29,30 @@ public class RubyPortlet extends GenericPortlet {
     // Check if current user are allowed to update the shared portlet preferences (i.e. has write permission on current page)
     if (hasWritePermission(aRenderRequest)) {
       PortletPreferences prefs = aRenderRequest.getPreferences();
-      PortletURL actionURL = aRenderResponse.createActionURL();
 
-      writer.println("<form action=\"" + actionURL.toString() + "\" method=\"post\">");
+      ScriptingContainer container = getScriptingContainer(writer);
+      container.put("action_url", aRenderResponse.createActionURL());
+      container.put("erb_template", prefs.getValue("erb", ""));
+      container.put("script", prefs.getValue("script", ""));
 
-      for (Enumeration enm = prefs.getNames(); enm.hasMoreElements(); ) {
-        String name = (String) enm.nextElement();
-        String value = prefs.getValue(name, "");
-        writer.println("<label for=\"" + name + "\">" + name + ": </label>");
-        writer.println("<textarea id=\"" + name + "\" name=\"" + name + "\" type=\"text\" style=\"width: 100%; height: 15em;\">" + value + "</textarea><br />");
-      }
-      writer.println("<input type=\"submit\" value=\"Save\" />");
-      writer.println("</form>");
+      container.runScriptlet("require 'erb'; template = ERB.new(File.read('./WEB-INF/views/config.html.erb'))\n" +
+        "puts template.result(binding)");
     } else {
       writer.println("<strong>You are not allowed to update the portlet configuration</strong>");
     }
   }
 
   protected void doView(RenderRequest aRenderRequest, RenderResponse aRenderResponse) throws PortletException, IOException {
-    PortletPreferences prefs = aRenderRequest.getPreferences();
     PrintWriter writer = aRenderResponse.getWriter();
+    PortletPreferences prefs = aRenderRequest.getPreferences();
 
-    ScriptingContainer container = new ScriptingContainer(LocalContextScope.THREADSAFE, LocalVariableBehavior.PERSISTENT);
+    ScriptingContainer container = getScriptingContainer(writer);
 
-    container.setOutput(writer);
     container.runScriptlet(prefs.getValue("script", ""));
     container.runScriptlet("require 'erb'; template = ERB.new <<-EOF\n" +
       prefs.getValue("erb", "") + "\n" +
       "EOF\n" +
       "puts template.result(binding)");
-    writer.flush();
   }
 
   public void processAction(ActionRequest anActionRequest, ActionResponse anActionResponse) throws PortletException, IOException {
@@ -83,5 +77,13 @@ public class RubyPortlet extends GenericPortlet {
     PermissionUtil permissionUtil = siteVisionUtils.getPermissionUtil();
 
     return permissionUtil.hasWritePermission();
+  }
+
+  protected final ScriptingContainer getScriptingContainer(PrintWriter writer) {
+    ScriptingContainer container = new ScriptingContainer(LocalContextScope.THREADSAFE, LocalVariableBehavior.PERSISTENT);
+    container.setOutput(writer);
+    container.setCurrentDirectory(getPortletContext().getRealPath(""));
+
+    return container;
   }
 }
